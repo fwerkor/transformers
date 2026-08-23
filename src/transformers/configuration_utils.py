@@ -488,6 +488,20 @@ class PreTrainedConfig(PushToHubMixin, RotaryEmbeddingConfigMixin, Heterogeneous
                 f"{self._attn_implementation}. Please set it to 'eager' instead."
             )
 
+    def validate_attention_head_counts(self):
+        """Validate grouped-query attention head-count relationships when the config exposes them."""
+        num_attention_heads = getattr(self, "num_attention_heads", None)
+        num_key_value_heads = getattr(self, "num_key_value_heads", None)
+        if num_attention_heads is None or num_key_value_heads is None:
+            return
+        if num_attention_heads <= 0 or num_key_value_heads <= 0:
+            raise ValueError("`num_attention_heads` and `num_key_value_heads` must both be positive.")
+        if num_attention_heads % num_key_value_heads != 0:
+            raise ValueError(
+                f"`num_attention_heads` ({num_attention_heads}) must be a multiple of "
+                f"`num_key_value_heads` ({num_key_value_heads})."
+            )
+
     def validate_architecture(self):
         """Part of `@strict`-powered validation. Validates the architecture of the config."""
         if self.is_heterogeneous:

@@ -22,8 +22,9 @@ import warnings
 from pathlib import Path
 
 import httpx
+from huggingface_hub.errors import StrictDataclassClassValidationError
 
-from transformers import AutoConfig, BertConfig, Florence2Config, GPT2Config
+from transformers import AutoConfig, BertConfig, Florence2Config, GlmConfig, GPT2Config, LlamaConfig
 from transformers.configuration_utils import PreTrainedConfig
 from transformers.testing_utils import TOKEN, TemporaryHubRepo, is_staging_test, require_torch
 
@@ -260,6 +261,26 @@ class ConfigTestUtils(unittest.TestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             PreTrainedConfig.from_pretrained("bert-base-uncased")
+
+    def test_gqa_head_count_validation(self):
+        for config_class in (LlamaConfig, GlmConfig):
+            with self.subTest(config_class=config_class.__name__):
+                with self.assertRaisesRegex(
+                    StrictDataclassClassValidationError, "num_attention_heads.*must be a multiple"
+                ):
+                    config_class(
+                        hidden_size=224,
+                        num_attention_heads=7,
+                        num_key_value_heads=2,
+                        head_dim=32,
+                    )
+
+                config_class(
+                    hidden_size=256,
+                    num_attention_heads=8,
+                    num_key_value_heads=2,
+                    head_dim=32,
+                )
 
     def test_get_text_config(self):
         """Tests the `get_text_config` method."""
