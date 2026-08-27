@@ -60,6 +60,19 @@ class RopeTest(unittest.TestCase):
             config.rope_parameters = rope_params
         return config
 
+    def test_odd_full_rotary_dimension_warns(self):
+        with self.assertLogs("transformers.modeling_rope_utils", level="WARNING") as logs:
+            LlamaConfig(hidden_size=520, num_attention_heads=8, num_hidden_layers=1)
+        self.assertTrue(any("full rotary embedding dimension is odd" in line for line in logs.output))
+
+        with self.assertNoLogs("transformers.modeling_rope_utils", level="WARNING"):
+            LlamaConfig(hidden_size=512, num_attention_heads=8, num_hidden_layers=1)
+
+        config = LlamaConfig(hidden_size=336, num_attention_heads=8, num_hidden_layers=1)
+        config.rope_parameters["partial_rotary_factor"] = 0.5
+        with self.assertNoLogs("transformers.modeling_rope_utils", level="WARNING"):
+            config.validate_rope()
+
     @parameterized.expand(
         [
             (True, True),

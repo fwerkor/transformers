@@ -840,12 +840,38 @@ class RotaryEmbeddingConfigMixin:
             validation_fn = getattr(self, f"_validate_{rope_type}_rope_parameters", None)
             rope_parameters["rope_type"] = rope_type
 
+            self._warn_if_odd_full_rotary_dimension(rope_parameters)
+
             if validation_fn is not None:
                 validation_fn(rope_parameters, ignore_keys=self.ignore_keys_at_rope_validation)
             else:
                 logger.warning(
                     f"Missing validation function in 'RotaryEmbeddingConfigMixin' for 'rope_type'='{rope_type}'"
                 )
+
+    def _warn_if_odd_full_rotary_dimension(self, rope_parameters: dict):
+        """Warn when full RoPE receives an odd rotary dimension that cannot be paired cleanly."""
+        partial_rotary_factor = rope_parameters.get("partial_rotary_factor", 1.0)
+        if partial_rotary_factor is None:
+            partial_rotary_factor = 1.0
+        if partial_rotary_factor < 1.0:
+            return
+
+        head_dim = getattr(self, "head_dim", None)
+        if head_dim is None:
+            hidden_size = getattr(self, "hidden_size", None)
+            num_attention_heads = getattr(self, "num_attention_heads", None)
+            if hidden_size is None or not num_attention_heads:
+                return
+            head_dim = hidden_size // num_attention_heads
+
+        rotary_dim = int(head_dim * partial_rotary_factor)
+        if rotary_dim % 2:
+            logger.warning(
+                f"The full rotary embedding dimension is odd ({rotary_dim}). RoPE rotates dimensions in pairs; "
+                "this configuration can fail with a tensor-size mismatch during the forward pass. Use an even "
+                "`head_dim` (or an even effective rotary dimension)."
+            )
 
     def _validate_default_rope_parameters(self, rope_parameters: dict, ignore_keys: set | None = None):
         required_keys = {"rope_type"}
